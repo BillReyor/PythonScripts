@@ -55,8 +55,8 @@ on notReverse(str)
 	return revNot
 end notReverse
 
-set obfuscateMe to "124 113 100 97 113 96 65 108 110 83 108 64 104 122 102 96 107 101"
-set clueList to words of obfuscateMe
+set flag to "124 113 100 97 113 96 65 108 110 83 108 64 104 122 102 96 107 101"
+set clueList to words of flag
 set cyberChefIngredients to ""
 repeat with aClue in clueList
 	set cyberChefIngredients to cyberChefIngredients & (ASCII character ((aClue as integer) + 1))
