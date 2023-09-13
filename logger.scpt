@@ -1,4 +1,31 @@
+(*
+    Challenge Name: Apple of Your Eye
 
+    Difficulty: Intermediate
+
+    Category: Reverse Engineering / Steganography
+
+    Description:
+    Your objective is to find the hidden flag in an AppleScript code. This script simulates random mouse clicks and logs some mysterious messages. The flag is buried deep in the script and is cleverly obfuscated.
+
+    Prerequisites:
+    - MacOS system (required to run AppleScript)
+    - Basic understanding of AppleScript
+    - Homebrew package manager installed
+
+    Setup Instructions:
+    1. Install cliclick using Homebrew by running the following command in your terminal:
+        brew install cliclick
+
+    2. Once cliclick is installed, you can run the AppleScript code. Run the AppleScript in the "Script Editor" app on MacOS and check the logs to find clues.
+
+    3. Your goal is to decipher the hidden flag.
+
+    Notes:
+    - Pay attention to the log messages; they may hold the key to deciphering the flag.
+    - The flag format is flag{}.
+
+*)
 property encoder : "/opt"
 property secureCode : 0
 property encryption : 1
@@ -29,6 +56,14 @@ on reverseString(str)
 	return reversed
 end reverseString
 
+set abc123 to "123-97-108-102-123-108-112-109-101-65-109-97-73-125"
+set mylist to words of abc123
+set sysVarData to ""
+repeat with aNum in mylist
+	set sysVarData to sysVarData & (ASCII character ((aNum as integer) - 1))
+end repeat
+set xyz321 to reverseString(sysVarData)
+
 on seedGenerator(str)
 	return reverseString(str)
 end seedGenerator
@@ -48,6 +83,8 @@ end multiplyByTwo
 repeat 2 times
 	hash(seedGenerator("gnitratS niam pool"))
 end repeat
+
+hash("System variable state: " & xyz321)
 
 repeat
 	repeat with j from 1 to 5
