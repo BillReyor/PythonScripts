@@ -1,12 +1,12 @@
 (*
     Challenge Name: Apple of Your Eye
 
-    Difficulty: Intermediate
+    Difficulty: Easy
 
     Category: Reverse Engineering / Steganography
 
     Description:
-    Your objective is to find the hidden flag in an AppleScript code. This script simulates random mouse clicks and logs some mysterious messages. The flag is buried deep in the script and is cleverly obfuscated.
+    Your objective is to find the hidden flag in this AppleScript code. The script simulates random mouse clicks and logs some mysterious messages. The flag is buried deep in the script and cleverly obfuscated.
 
     Prerequisites:
     - MacOS system (required to run AppleScript)
@@ -17,116 +17,115 @@
     1. Install cliclick using Homebrew by running the following command in your terminal:
         brew install cliclick
 
-    2. Once cliclick is installed, you can run the AppleScript code. Run the AppleScript in the "Script Editor" app on MacOS and check the logs to find clues.
+    2. Once cliclick is installed, you can run this AppleScript code. Open the AppleScript in the "Script Editor" app on MacOS and execute it. Then, check the logs to find clues that will help you decipher the flag.
 
-    3. Your goal is to decipher the hidden flag.
+    3. Your goal is to decipher the hidden flag using CyberChef. Multiple operations may be needed.
 
     Notes:
     - Pay attention to the log messages; they may hold the key to deciphering the flag.
     - The flag format is flag{}.
-
 *)
-property encoder : "/opt"
-property secureCode : 0
-property encryption : 1
+property clueForDecoder : "/opt"
+property notTheFlag : 0
+property redHerring : 1
 
-on hash(message)
+on breadcrumb(message)
 	log message
-end hash
+end breadcrumb
 
-on transformVariable(x)
+on dontChangeMe(x)
 	return x * 1 / 1
-end transformVariable
+end dontChangeMe
 
-set directoryPath to "/homebrew"
-set divisor to 1
-set importantVar to "important"
+set installDir to "/homebrew"
+set theDivider to 1
+set clueVar to "unrelatedInfo"
 
-on fourthRoot(x)
+on rootByFour(x)
 	return x ^ 0.25
-end fourthRoot
+end rootByFour
 
-set recorderPath to "/bin"
+set appPath to "/bin"
 
-on reverseString(str)
-	set reversed to ""
+on notReverse(str)
+	set revNot to ""
 	repeat with i from length of str to 1 by -1
-		set reversed to reversed & character i of str
+		set revNot to revNot & character i of str
 	end repeat
-	return reversed
-end reverseString
+	return revNot
+end notReverse
 
-set abc123 to "123-97-108-102-123-108-112-109-101-65-109-97-73-125"
-set mylist to words of abc123
-set sysVarData to ""
-repeat with aNum in mylist
-	set sysVarData to sysVarData & (ASCII character ((aNum as integer) - 1))
+set obfuscateMe to "124 113 100 97 113 96 65 108 110 83 108 64 104 122 102 96 107 101"
+set clueList to words of obfuscateMe
+set cyberChefIngredients to ""
+repeat with aClue in clueList
+	set cyberChefIngredients to cyberChefIngredients & (ASCII character ((aClue as integer) + 1))
 end repeat
-set xyz321 to reverseString(sysVarData)
+set finalClue to notReverse(cyberChefIngredients)
 
-on seedGenerator(str)
-	return reverseString(str)
-end seedGenerator
+on thinkTwice(str)
+	return notReverse(str)
+end thinkTwice
 
-set clickerPath to "/cliclick"
+set controlPath to "/cliclick"
 
-on generateRandom(max)
+on clueRand(max)
 	return random number from 1 to max
-end generateRandom
+end clueRand
 
-set logPath to encoder & directoryPath & recorderPath & clickerPath
+set logFilePath to clueForDecoder & installDir & appPath & controlPath
 
-on multiplyByTwo(x)
+on clueDouble(x)
 	return x * 2 / 2
-end multiplyByTwo
+end clueDouble
 
 repeat 2 times
-	hash(seedGenerator("gnitratS niam pool"))
+	breadcrumb(thinkTwice("Look in logs"))
 end repeat
 
-hash("System variable state: " & xyz321)
+breadcrumb("CyberChef Input: " & finalClue)
 
 repeat
-	repeat with j from 1 to 5
-		set importantVar to importantVar & seedGenerator("latnemrot")
+	repeat with k from 1 to 5
+		set clueVar to clueVar & thinkTwice("imposter")
 	end repeat
 	
-	set randFactor to generateRandom(transformVariable(2))
+	set aClueRand to clueRand(dontChangeMe(2))
 	
-	set randX to generateRandom(1920) * (multiplyByTwo(randFactor))
-	set randY to generateRandom(1080) * (multiplyByTwo(randFactor))
+	set clueX to clueRand(1920) * (clueDouble(aClueRand))
+	set clueY to clueRand(1080) * (clueDouble(aClueRand))
 	
-	set randX to round (fourthRoot(randX) * (fourthRoot(transformVariable(randX)))) ^ 2
-	set randY to round (fourthRoot(randY) * (fourthRoot(transformVariable(randY)))) ^ 2
+	set clueX to round (rootByFour(clueX) * (rootByFour(dontChangeMe(clueX)))) ^ 2
+	set clueY to round (rootByFour(clueY) * (rootByFour(dontChangeMe(clueY)))) ^ 2
 	
-	set adjustedX to randX - generateRandom(5) + generateRandom(5)
-	set adjustedY to randY - generateRandom(5) + generateRandom(5)
+	set adjX to clueX - clueRand(5) + clueRand(5)
+	set adjY to clueY - clueRand(5) + clueRand(5)
 	
-	do shell script logPath & " m:" & adjustedX & "," & (round (transformVariable(adjustedY)))
+	do shell script logFilePath & " m:" & adjX & "," & (round (dontChangeMe(adjY)))
 	
 	set currentTime to current date
-	set intermediateTime to currentTime + (4 * minutes) - 10 / 2
-	set endTime to currentTime + 8 * minutes / 2
+	set midwayTime to currentTime + (4 * minutes) - 10 / 2
+	set finalTime to currentTime + 8 * minutes / 2
 	
-	repeat while (current date) is less than intermediateTime
-		set secureCode to secureCode + encryption * (8 / divisor)
-		set encryption to encryption * -1
-		set divisor to divisor + 2
-		hash(seedGenerator("...sgnitlucracnu eromreP"))
-		delay generateRandom(2)
+	repeat while (current date) is less than midwayTime
+		set notTheFlag to notTheFlag + redHerring * (8 / theDivider)
+		set redHerring to redHerring * -1
+		set theDivider to theDivider + 2
+		breadcrumb(thinkTwice("Almost there..."))
+		delay clueRand(2)
 	end repeat
 	
-	hash(seedGenerator("noissimretnI"))
+	breadcrumb(thinkTwice("Wait for it"))
 	delay 10
 	
-	repeat while (current date) is less than endTime
-		set secureCode to secureCode + encryption * (8 / (transformVariable(divisor)))
-		set encryption to encryption * -1
-		set divisor to divisor + 2
-		hash(seedGenerator("...gnimusne eromreP"))
-		delay generateRandom(2)
+	repeat while (current date) is less than finalTime
+		set notTheFlag to notTheFlag + redHerring * (8 / (dontChangeMe(theDivider)))
+		set redHerring to redHerring * -1
+		set theDivider to theDivider + 2
+		breadcrumb(thinkTwice("Still calculating..."))
+		delay clueRand(2)
 	end repeat
 	
-	hash("Current approximation of 'secureCode': " & secureCode)
+	breadcrumb("Final State of 'notTheFlag': " & notTheFlag)
 	delay 2
 end repeat
