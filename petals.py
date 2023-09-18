@@ -9,15 +9,18 @@ For more details and to set up your own backend, please visit: https://github.co
 
 import json
 import websocket
+import time
 
 # Global variables
-prompt = "Who is your daddy and what does he do?"
 max_length = 150
 stop_sequence = None  # You can set this to a string if you want the generation to stop at a specific sequence
 
 def on_open(ws):
     """Handles WebSocket open event."""
+    global prompt
     print("WebSocket opened. Opening inference session...")
+    
+    prompt = input("Enter your prompt: ")
     
     # Open inference session
     ws.send(json.dumps({
@@ -36,6 +39,10 @@ def on_message(ws, event):
         if response.get('ok'):
             if 'outputs' not in response:
                 print("Inference session opened. Generating text...")
+                for i in range(3):
+                    print(".", end="", flush=True)
+                    time.sleep(1)
+                print()
                 
                 # Generate text
                 ws.send(json.dumps({
@@ -43,7 +50,7 @@ def on_message(ws, event):
                     "inputs": prompt,
                     "max_length": max_length,
                     "do_sample": 1,
-                    "temperature": 0.7,
+                    "temperature": 0.6,
                     "top_p": 0.9,
                     "stop_sequence": stop_sequence  # Optional
                 }))
