@@ -43,7 +43,7 @@ def on_message(ws, event):
                     "inputs": prompt,
                     "max_length": max_length,
                     "do_sample": 1,
-                    "temperature": 0.6,
+                    "temperature": 0.7,
                     "top_p": 0.9,
                     "stop_sequence": stop_sequence  # Optional
                 }))
