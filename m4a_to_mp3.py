@@ -110,4 +110,4 @@ def main(directory):
     remove_empty_folders(directory)
 
 if __name__ == "__main__":
-    main('/Users/williamreyor/Desktop/Music')  # Replace with your directory path
+    main('/Users/user/Desktop/Music')  # Replace with your directory path
