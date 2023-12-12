@@ -15,7 +15,7 @@ def convert_m4a_to_mp3(file_path):
     str: The file path of the converted MP3 file.
     """
     mp3_file = file_path.rsplit('.', 1)[0] + '.mp3'
-    subprocess.run(['ffmpeg', '-i', file_path, '-acodec', 'libmp3lame', '-q:a', '2', mp3_file])
+    subprocess.run(['ffmpeg', '-y', '-i', file_path, '-acodec', 'libmp3lame', '-q:a', '2', mp3_file])
     return mp3_file
 
 def copy_metadata_with_artwork(m4a_file, mp3_file):
