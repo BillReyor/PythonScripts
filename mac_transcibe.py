@@ -1,5 +1,5 @@
 """
-This script is designed for transcribing audio files and generating concise summaries of the transcribed text. It first checks for necessary dependencies, including ffmpeg and Python packages like 'whisper' and 'transformers'. The script can transcribe audio files to text using the Whisper model. It then uses the Llama model (Mistral 7B Instruct version) to analyze and summarize the transcribed text, producing a concise summary of the key points and topics discussed in the audio.
+ This script is designed for transcribing audio files and generating concise summaries of the transcribed text. It first checks for necessary dependencies, including ffmpeg and Python packages like 'whisper' and 'transformers'. The script can transcribe audio files to text using the Whisper model. It then uses the Llama model (Mistral 7B Instruct version) to analyze and summarize the transcribed text, producing a concise summary of the key points and topics discussed in the audio.
 
 Functions:
 - check_dependencies(): Verifies the presence of required software and packages.
