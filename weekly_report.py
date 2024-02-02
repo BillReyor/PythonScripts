@@ -1,3 +1,14 @@
+"""
+This script is tailored for processing ICS calendar files to extract, summarize, and compile a comprehensive overview of events scheduled for a given week. Initially, it verifies the availability of essential dependencies, including 'icalendar', 'torch', 'transformers', and 'llama_cpp'. The script processes the ICS file to delineate events within the current week, organizing them by day. Utilizing the Llama model (Mistral 7B Instruct version), it generates concise summaries for each day's events. These daily summaries are then aggregated and further condensed into a final summary, encapsulating the week's key activities and highlights in a succinct narrative.
+
+Functions:
+- check_dependencies(): Checks for the installation of required dependencies, ensuring the script's prerequisites are met.
+- process_ics_file(file_path): Parses the ICS file to extract and group events by day for the current week, preparing them for summarization.
+- analyze_and_summarize(text, llm): Summarizes the provided text using the Llama model, creating concise summaries of daily events.
+- finalize_summary(llm): Compiles the daily summaries from 'summary.txt', producing a final, overarching summary of the week's events, which is saved to 'final_summary.txt'.
+- main(): Coordinates the script's operations, from dependency verification and event extraction to the generation of daily and final weekly summaries.
+"""
+
 import sys
 import datetime
 from icalendar import Calendar
