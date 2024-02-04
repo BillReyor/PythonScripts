@@ -1,24 +1,17 @@
 """
-This script is designed for processing .ics (iCalendar) files to generate concise summaries of events within a user-defined date range. It leverages Llama CPP for text summarization and requires specific system and software prerequisites.
+This script processes .ics calendar files to generate summaries of events within a specified date range. 
 
-System Requirements:
-- Compatible with M1 Mac (or later versions) equipped with a minimum of 16GB of RAM for optimal performance.
-
-Software Dependencies:
-- Python packages: Before running the script, ensure the installation of required Python packages: `re`, `datetime`, `glob`, `os`, `sys`, `icalendar`, `torch`, `transformers`, `llama-cpp-python`, `pytz`, and `tzlocal` using pip.
-
-Model File Requirement:
-- The Llama model file named 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' must be present in the same directory as the script. It is essential for text summarization and can be downloaded from the specified source (source not provided).
-
-Instructions for Use:
-1. Place .ics calendar files in the same directory as this script.
-2. Execute the script and enter your name along with the start and end dates for the event summary when prompted.
-3. The script allows adjustments in `n_ctx` (up to 32768) and `max_tokens` parameters in `analyze_and_summarize` and `finalize_summary` functions to manage the summary output according to system memory capability. Note: A `n_ctx` of 32768 requires at least 16GB of RAM. The default setting is 16384.
-
-This script is structured to first process the .ics files to filter events within the specified range, then analyze and summarize the event details using the Llama model, and finally consolidate the summaries into a comprehensive report.
+Requirements:
+- System: M1 Mac (or later) with at least 16GB of RAM.
+- Dependencies: Install the following Python packages via pip: re, datetime, glob, os, sys, icalendar, torch, transformers, llama-cpp-python, pytz, tzlocal .
+- Model File: Ensure 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' is in the same directory as this script. Download from: clear
+Usage:
+1. Place your .ics calendar export files in the same directory as this script.
+2. Run the script and follow on-screen instructions to input your name and the date range for the summary.
+3. Depending on output adjust n_ctx upto 32768 as well as max_tokens in the analyze_and_summarize and finalize_summary functions.
+    - Note that for a 32768 context size you will need AT LEAST 16gb of RAM
+    - Default is 16384
 """
-
-
 import re
 import glob
 import os
@@ -32,23 +25,43 @@ from transformers import AutoTokenizer
 from llama_cpp import Llama
 
 def sanitize_information(text):
-    """Sanitize sensitive information from text."""
+    """
+    Removes sensitive information from the provided text by replacing it with '[redacted]'. 
+    Sensitive information includes email addresses, phone numbers, URLs, meeting IDs, passcodes, and PINs.
+
+    Parameters:
+    - text (str): The input text containing potentially sensitive information.
+
+    Returns:
+    - str: The sanitized text with sensitive information redacted.
+    """
     patterns = [
-        r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",  
-        r"\(\d{3}\)\s\d{3}-\d{4}",  
-        r"\+\d{1,3}\s?(\(\d{1,3}\))?\s?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,4}(?:[\s-]?\d{1,4})?",  
-        r"\bhttps?:\/\/[^\s]+",  
-        r"\bMeeting ID: \S+",  
-        r"\bPasscode: \S+",  
-        r"\bPIN: \d+",  
-        r"\bID: \d{9,11}",  
+        r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+        r"\(\d{3}\)\s\d{3}-\d{4}",
+        r"\+\d{1,3}\s?(\(\d{1,3}\))?\s?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,4}(?:[\s-]?\d{1,4})?",
+        r"\bhttps?:\/\/[^\s]+",
+        r"\bMeeting ID: \S+",
+        r"\bPasscode: \S+",
+        r"\bPIN: \d+",
+        r"\bID: \d{9,11}",
     ]
     for pattern in patterns:
         text = re.sub(pattern, '[redacted]', text, flags=re.IGNORECASE)
     return text
 
 def process_ics_file(file_path, start_date, end_date, user_tz):
-    """Process ICS file events within a specified date range considering time zones."""
+    """
+    Processes events from an ICS file that fall within a specified date range and timezone.
+
+    Parameters:
+    - file_path (str): Path to the .ics file to be processed.
+    - start_date (date): The start date of the range to filter events.
+    - end_date (date): The end date of the range to filter events.
+    - user_tz (timezone): The user's timezone, used for time conversion.
+
+    Returns:
+    - list: A sorted list of events by day, each represented as a tuple (date, list of event details).
+    """
     with open(file_path, 'rb') as file:
         calendar = Calendar.from_ical(file.read())
 
@@ -58,7 +71,7 @@ def process_ics_file(file_path, start_date, end_date, user_tz):
     for component in calendar.walk():
         if component.name == "VEVENT":
             dtstart = component.get('dtstart').dt
-            
+
             if isinstance(dtstart, datetime.datetime):
                 if dtstart.tzinfo is None:
                     dtstart = dtstart.replace(tzinfo=user_timezone)
@@ -91,8 +104,20 @@ def process_ics_file(file_path, start_date, end_date, user_tz):
     return sorted_events_by_day
 
 def analyze_and_summarize(text, llm, user_name, event_date, summary_file='summary.txt'):
-    """Analyze and summarize text using Llama model, outputting to specified file."""
-    print(f"Analyzing and consolidate events for {event_date} in {summary_file}...")
+    """
+    Analyzes and summarizes the given text using the specified Llama model and writes the output to a file.
+
+    Parameters:
+    - text (str): Text containing events to be summarized.
+    - llm (Llama): The Llama model to use for text analysis and summarization.
+    - user_name (str): The name of the user for personalization purposes.
+    - event_date (datetime.date): The date of the events being summarized.
+    - summary_file (str, optional): The file path where the summary will be written. Defaults to 'summary.txt'.
+
+    Returns:
+    - str: The generated summary of the events.
+    """
+    print(f"Analyzing and consolidating events for {event_date} in {summary_file}...")
     example = """
 I. [Date]
     A. [Time]: [Event title]
@@ -101,7 +126,7 @@ I. [Date]
         * [Event detail]
     and so on...
     """
-    
+
     prompt = f"""
 <s>[INST] This is my calendar entry for 
 {event_date.strftime('%m-%d-%Y')} (mm-dd-yyyy) Report what I did during 
@@ -126,14 +151,22 @@ Actual day: {text} [/INST]</s>
     return response
 
 def finalize_summary(llm):
-    """Finalize summary by organizing content from two summaries."""
+    """
+    Finalizes the summary by comparing, fact-checking, and consolidating content from two summary files.
+
+    Parameters:
+    - llm (Llama): The Llama model to use for final summarization and fact-checking.
+
+    This function reads from 'summary.txt' and 'summary2.txt', then generates a consolidated final summary,
+    which is written to 'final_summary.txt'.
+    """
     # Modify this part to read both summaries and create a combined final summary
     with open('summary.txt', 'r') as file1:
         text1 = file1.read().strip()
     with open('summary2.txt', 'r') as file2:
         text2 = file2.read().strip()
 
-    prompt = f"""<s>[INST] Fact check and summerize,  review the information from the first and second summary IGNORE any event not in both. Create a consolidated final weekly report by day.
+    prompt = f"""<s>[INST] Fact check and summarize,  review the information from the first and second summary IGNORE any event not in both. Create a consolidated final weekly report by day.
 
 First summary data:
 {text1}
@@ -150,8 +183,15 @@ Second summary data:
     print("Final summary has been organized and written to 'final_summary.txt'.")
 
 def main():
+    """
+    Main function to execute the script workflow. It prompts the user for input, processes .ics files, 
+    and generates summarized outputs based on the events within the specified date range.
+
+    This function orchestrates the reading of calendar files, extraction of relevant events, analysis and summarization 
+    of these events using a Llama model, and finalization of the event summaries into a comprehensive document.
+    """
     user_name = input("Please enter your name: ")
-    start_date_input = input("Enter the start date (mm-dd-yyyy): ")  
+    start_date_input = input("Enter the start date (mm-dd-yyyy): ")
     end_date_input = input("Enter the end date (mm-dd-yyyy): ")
     user_tz = get_localzone()
     start_date = datetime.datetime.strptime(start_date_input, "%m-%d-%Y").date()
