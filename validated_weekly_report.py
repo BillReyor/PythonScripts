@@ -1,17 +1,23 @@
 """
-This script processes .ics calendar files to generate summaries of events within a specified date range. 
+This script is designed for processing .ics (iCalendar) files to generate concise summaries of events within a user-defined date range. It leverages Llama CPP for text summarization and requires specific system and software prerequisites.
 
-Requirements:
-- System: M1 Mac (or later) with at least 16GB of RAM.
-- Dependencies: Install the following Python packages via pip: re, datetime, glob, os, sys, icalendar, torch, transformers, llama-cpp-python, pytz, tzlocal .
-- Model File: Ensure 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' is in the same directory as this script. Download from: clear
-Usage:
-1. Place your .ics calendar export files in the same directory as this script.
-2. Run the script and follow on-screen instructions to input your name and the date range for the summary.
-3. Depending on output adjust n_ctx upto 32768 as well as max_tokens in the analyze_and_summarize and finalize_summary functions.
-    - Note that for a 32768 context size you will need AT LEAST 16gb of RAM
-    - Default is 16384
+System Requirements:
+- Compatible with M1 Mac (or later versions) equipped with a minimum of 16GB of RAM for optimal performance.
+
+Software Dependencies:
+- Python packages: Before running the script, ensure the installation of required Python packages: `re`, `datetime`, `glob`, `os`, `sys`, `icalendar`, `torch`, `transformers`, `llama-cpp-python`, `pytz`, and `tzlocal` using pip.
+
+Model File Requirement:
+- The Llama model file named 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' must be present in the same directory as the script. It is essential for text summarization and can be downloaded from the specified source (source not provided).
+
+Instructions for Use:
+1. Place .ics calendar files in the same directory as this script.
+2. Execute the script and enter your name along with the start and end dates for the event summary when prompted.
+3. The script allows adjustments in `n_ctx` (up to 32768) and `max_tokens` parameters in `analyze_and_summarize` and `finalize_summary` functions to manage the summary output according to system memory capability. Note: A `n_ctx` of 32768 requires at least 16GB of RAM. The default setting is 16384.
+
+This script is structured to first process the .ics files to filter events within the specified range, then analyze and summarize the event details using the Llama model, and finally consolidate the summaries into a comprehensive report.
 """
+
 
 import re
 import glob
