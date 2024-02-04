@@ -1,153 +1,181 @@
-""" Experimental test code to summarize calendars given an ics export """
-import sys
+"""
+This script processes .ics calendar files to generate summaries of events within a specified date range. 
+
+Requirements:
+- System: Mac with at least 16GB of RAM.
+- Dependencies: Install the following Python packages via pip: re, datetime, glob, os, sys, icalendar, torch, transformers, llama-cpp-python, pytz, tzlocal .
+- Model File: Ensure 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' is in the same directory as this script. Download from: clear
+Usage:
+1. Place your .ics calendar export files in the same directory as this script.
+2. Run the script and follow on-screen instructions to input your name and the date range for the summary.
+3. Depending on output adjust n_ctx upto 32768 as well as max_tokens in the analyze_and_summarize and finalize_summary functions.
+    - Note that for a 32768 context size you will need AT LEAST 16gb of RAM
+    - Default is 16384
+"""
+
+import re
+import glob
 import os
-import glob  # For pattern matching on file names
+import sys
+import pytz
+import torch
 import datetime
+from tzlocal import get_localzone
 from icalendar import Calendar
+from transformers import AutoTokenizer
+from llama_cpp import Llama
 
-def check_dependency(module_name):
-    """
-    Attempts to import a module by name. Returns True if successful, False otherwise.
-    """
-    try:
-        __import__(module_name)
-        return True
-    except ImportError:
-        return False
+def sanitize_information(text):
+    """Sanitize sensitive information from text."""
+    patterns = [
+        r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",  
+        r"\(\d{3}\)\s\d{3}-\d{4}",  
+        r"\+\d{1,3}\s?(\(\d{1,3}\))?\s?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,4}(?:[\s-]?\d{1,4})?",  
+        r"\bhttps?:\/\/[^\s]+",  
+        r"\bMeeting ID: \S+",  
+        r"\bPasscode: \S+",  
+        r"\bPIN: \d+",  
+        r"\bID: \d{9,11}",  
+    ]
+    for pattern in patterns:
+        text = re.sub(pattern, '[redacted]', text, flags=re.IGNORECASE)
+    return text
 
-def ensure_dependencies():
-    """
-    Ensures all required dependencies are installed.
-    """
-    dependencies = ["icalendar", "torch", "transformers", "llama_cpp"]
-    missing_dependencies = [dep for dep in dependencies if not check_dependency(dep)]
+def process_ics_file(file_path, start_date, end_date, user_tz):
+    """Process ICS file events within a specified date range considering time zones."""
+    with open(file_path, 'rb') as file:
+        calendar = Calendar.from_ical(file.read())
 
-    if missing_dependencies:
-        print("The following dependencies are missing:")
-        for dep in missing_dependencies:
-            print(f"- {dep}. To install, run: pip install {dep}")
-        sys.exit("Exiting due to missing dependencies.")
+    user_timezone = user_tz
 
-def process_ics_file(file_path, start_date, end_date):
-    """
-    Processes the events from the specified ICS file and generates a detailed report for a specified date range,
-    grouped by day.
-    """
-    with open(file_path, 'rb') as f:
-        cal = Calendar.from_ical(f.read())
-    
     events_by_day = {}
-    for component in cal.walk():
+    for component in calendar.walk():
         if component.name == "VEVENT":
             dtstart = component.get('dtstart').dt
-            summary = str(component.get('summary'))
-            description = str(component.get('description')) if component.get('description') else "No description"
-            location = str(component.get('location')) if component.get('location') else "No location specified"
             
-            dtstart_str = dtstart.strftime("%Y-%m-%d %H:%M") if isinstance(dtstart, datetime.datetime) else dtstart.strftime("%Y-%m-%d")
-            dtstart_date = dtstart.date() if isinstance(dtstart, datetime.datetime) else dtstart
-            
-            if start_date <= dtstart_date <= end_date:
-                event_details = f"Event: {summary}\nTime: {dtstart_str}\nDescription: {description}\nLocation: {location}\n"
-                if dtstart_date not in events_by_day:
-                    events_by_day[dtstart_date] = [event_details]
+            if isinstance(dtstart, datetime.datetime):
+                if dtstart.tzinfo is None:
+                    dtstart = dtstart.replace(tzinfo=user_timezone)
                 else:
-                    events_by_day[dtstart_date].append(event_details)
-    
-    sorted_events_by_day = sorted(events_by_day.items())
+                    dtstart = dtstart.astimezone(user_timezone)
+                dtstart_str = dtstart.strftime("%Y-%m-%d %H:%M")
+                event_date = dtstart.date()
+            else:
+                dtstart_str = dtstart.strftime("%Y-%m-%d")
+                event_date = dtstart
+
+            summary = str(component.get('summary'))
+            description = sanitize_information(str(component.get('description'))) if component.get('description') else "No description"
+            if "This event was created by" in description:
+                continue  # Skip the rest of the loop and do not include this event
+            location = str(component.get('location')) if component.get('location') else "No location specified"
+            location = sanitize_information(location)
+
+            if start_date <= event_date <= end_date:
+                event_details = (
+                    f"Event: {summary}\n"
+                    f"Time: {dtstart_str}\n"
+                    f"Description: {description}\n"
+                    f"Location: {location}\n"
+                )
+                events_by_day.setdefault(event_date, []).append(event_details)
+
+    sorted_events_by_day = sorted(events_by_day.items(), key=lambda x: x[0])
+
     return sorted_events_by_day
 
-def analyze_and_summarize(text, llm, user_name, event_date):
+def analyze_and_summarize(text, llm, user_name, event_date, summary_file='summary.txt'):
+    """Analyze and summarize text using Llama model, outputting to specified file."""
+    print(f"Analyzing and summarizing events for {event_date} in {summary_file}...")
+    example = """
+I. [Date]
+    A. [Time]: [Event title]
+        * [Event detail]
+    B. [Time]: [Event title]
+        * [Event detail]
+    and so on...
     """
-    Analyzes and summarizes the given text using the Llama model, focusing on clarity, structure, and actionable insights.
-    Each summary starts with "On [date], I..."
-    """
-    prompt = f"""<s>[INST] My name is {user_name}. This is my calendar please creating a summary of what I did during the day in paragraph form. Organize the day from early to late. .
-    IGNORE / DO NOT INCLUDE personal habits like Decompression, self-care, etc.;
-    IGNORE / DO NOT INCLUDE sensitive or confidential information including zoom links, passwords, or personal details.
-    On {event_date.strftime('%d-%m-%Y')}, I Events: {text} [/INST]</s>"""
-
-    output = llm(
-        prompt,
-        max_tokens=32768,
-        stop=["</s>"],
-        echo=False
-    )
     
-    if isinstance(output, dict) and 'choices' in output:
-        response = output['choices'][0]['text'] if output['choices'] else "No response generated."
-    else:
-        response = str(output)
+    prompt = f"""
+<s>[INST] This is my calendar entry for 
+{event_date.strftime('%m-%d-%Y')} (mm-dd-yyyy) Create a summary of what I did during 
+the day ensuring output sorted from early to late as provided in the example. 
 
-    with open('summary.txt', 'a') as file:
-        file.write("On " + event_date.strftime('%d-%m-%Y') + ", I " + response + "\n\n")  
-    
+Ensure that:
+- If you are uncertain indicate that something is unknown rather than making it up
+- Ignore the actual formatting and structure and follow the styling from the example:
+{example}
+
+Actual day: {text} [/INST]</s>
+"""
+
+    output = llm(prompt=prompt, max_tokens=8192, stop=["</s>"], echo=False)
+    response = output['choices'][0]['text'] if output.get('choices') else "No response generated."
+
+    with open(summary_file, 'a') as file:
+        file.write(f"{response}\n\n")
+
     return response
 
 def finalize_summary(llm):
-    """
-    Reads the content from summary.txt, organizes it by day, and writes the final, grouped summary to final_summary.txt.
-    """
-    with open('summary.txt', 'r') as file:
-        text = file.read()
-    prompt = f"""<s>[INST] Create a narrative of what I did during the week. Be sure to create a summary for each day of the week starting with the earlies to latest the date is formated as (YYYY-MM-DD) .:
-    : {text} [/INST]</s>"""
-    
-    output = llm(
-        prompt,
-        max_tokens=32768,
-        stop=["</s>"],
-        echo=False
-    )
-    
-    if isinstance(output, dict) and 'choices' in output:
-        final_response = output['choices'][0]['text'] if output['choices'] else "No final summary generated."
-    else:
-        final_response = str(output)
+    """Finalize summary by organizing content from two summaries."""
+    # Modify this part to read both summaries and create a combined final summary
+    with open('summary.txt', 'r') as file1:
+        text1 = file1.read().strip()
+    with open('summary2.txt', 'r') as file2:
+        text2 = file2.read().strip()
+
+    prompt = f"""<s>[INST] Fact check and summerize,  review the information from the first and second summary IGNORE any event not in both. Create a consolidated final weekly report by day.
+
+First summary data:
+{text1}
+
+Second summary data:
+{text2} [/INST]</s>"""
+
+    output = llm(prompt=prompt, max_tokens=16384, stop=["</s>"], echo=False)
+    final_response = output['choices'][0]['text'] if output.get('choices') else "No final summary generated."
 
     with open('final_summary.txt', 'w') as file:
         file.write(final_response)
 
-    print("Final summary has been organized by day and written to final_summary.txt.")
+    print("Final summary has been organized and written to 'final_summary.txt'.")
 
 def main():
-    ensure_dependencies()
-    
     user_name = input("Please enter your name: ")
-    start_date_input = input("Enter the start date (YYYY-MM-DD): ")
-    end_date_input = input("Enter the end date (YYYY-MM-DD): ")
-
-    start_date = datetime.datetime.strptime(start_date_input, "%Y-%m-%d").date()
-    end_date = datetime.datetime.strptime(end_date_input, "%Y-%m-%d").date()
-    
-    import torch
-    from transformers import AutoTokenizer
-    from llama_cpp import Llama
+    start_date_input = input("Enter the start date (mm-dd-yyyy): ")  
+    end_date_input = input("Enter the end date (mm-dd-yyyy): ")
+    user_tz = get_localzone()
+    start_date = datetime.datetime.strptime(start_date_input, "%m-%d-%Y").date()
+    end_date = datetime.datetime.strptime(end_date_input, "%m-%d-%Y").date()
 
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     model_path = "./mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-    
+
     if not os.path.exists(model_path):
         sys.exit("Model file not found. Please download the model file before proceeding.")
-    
-    llm = Llama(model_path=model_path, n_ctx=32768, n_threads=8, n_gpu_layers=35)
+
+    llm = Llama(model_path=model_path, n_ctx=8192, n_threads=16, n_gpu_layers=35)
+    llm2 = Llama(model_path=model_path, n_ctx=16384, n_threads=16, n_gpu_layers=35)
     tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
 
     ics_files = glob.glob('*.ics')
     if not ics_files:
         sys.exit("No .ics files found in the current directory.")
 
+    # Clear out old summaries
     open('summary.txt', 'w').close()
+    open('summary2.txt', 'w').close()
 
     for file_path in ics_files:
         print(f"Processing {file_path}...")
-        sorted_events_by_day = process_ics_file(file_path, start_date, end_date)
-
+        sorted_events_by_day = process_ics_file(file_path, start_date, end_date, user_tz)
         for date, events in sorted_events_by_day:
             day_events_text = "\n".join(events)
-            analyze_and_summarize(day_events_text, llm, user_name, date)
+            analyze_and_summarize(day_events_text, llm, user_name, date, 'summary.txt')
+            analyze_and_summarize(day_events_text, llm, user_name, date, 'summary2.txt')
 
-    finalize_summary(llm)
-    
+    finalize_summary(llm2)
+
 if __name__ == "__main__":
     main()
