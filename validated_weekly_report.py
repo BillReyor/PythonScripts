@@ -1,5 +1,7 @@
+# Status: not functional
 """
-This script is designed to generate event summaries from .ics calendar files within a specified date range. It extracts event details, sanitizes sensitive information, and uses a language model to produce consolidated summaries of daily activities.
+This script is designed to generate event summaries from .ics calendar files within a specified date range.
+It extracts event details, sanitizes sensitive information, and uses a language model to produce consolidated summaries of daily activities.
 
 Requirements:
 - System: macOS with M1 chip (or later) and a minimum of 16GB RAM for efficient processing.
@@ -19,6 +21,7 @@ Key Functionalities:
 
 This script is suitable for individuals looking to obtain a summarized overview of their calendar events over a given period without manually combing through each entry.
 """
+
 import re
 import glob
 import os
@@ -171,7 +174,7 @@ def finalize_summary(llm):
         with open('summary3.txt', 'r') as file3:
             text3 = file3.read().strip()
 
-    summaries_exist = text3 != ""  # Check if the third summary exists
+    summaries_exist = text3 != ""
 
     if summaries_exist:
         print("Comparing all three summaries to identify the most accurate consolidation...")
@@ -199,10 +202,8 @@ Second summary:
     if "MISMATCH" in final_response and not summaries_exist:
         print("Discrepancy detected. Generating a third summary for further validation...")
         current_date = datetime.datetime.now()
-        # Assume `analyze_and_summarize` is correctly defined elsewhere in your script
         analyze_and_summarize(text1 + "\n" + text2, llm, "Validation Run", current_date, 'summary3.txt')
-        # After generating the third summary, you should manually call `finalize_summary` again 
-        # to re-evaluate with the new summary3.txt included
+        finalize_summary(llm)  # Reinitialize the finalize_summary function
     elif "MISMATCH" in final_response and summaries_exist:
         print("Discrepancies detected even after three summaries. Manual review required.")
     else:
@@ -242,7 +243,7 @@ def main():
 
     open('summary.txt', 'w').close()
     open('summary2.txt', 'w').close()
-    open('summary3.txt', 'w').close()  # Ensure this is also reset for a new run
+    open('summary3.txt', 'w').close()
 
     for file_path in ics_files:
         print(f"Processing {file_path}...")
