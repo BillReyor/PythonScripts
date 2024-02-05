@@ -171,14 +171,11 @@ def finalize_summary(llm):
         with open('summary3.txt', 'r') as file3:
             text3 = file3.read().strip()
 
-    # Modification to ensure that the presence of text in summary3.txt is checked
-    summaries_exist = text3 != ""
+    summaries_exist = text3 != ""  # Check if the third summary exists
 
-    # Adjusted the logic to handle cases when summary3.txt is empty or not needed
     if summaries_exist:
-        # Modified to include correct logic when all summaries exist
         print("Comparing all three summaries to identify the most accurate consolidation...")
-        prompt = """<s>[INST] Compare three summaries and identify the most accurate consolidation. 
+        prompt = f"""<s>[INST] Compare three summaries and identify the most accurate consolidation. 
 First summary:
 {text1}
 
@@ -186,37 +183,35 @@ Second summary:
 {text2}
 
 Third summary:
-{text3}[/INST]</s>""".format(text1=text1, text2=text2, text3=text3)
+{text3}[/INST]</s>"""
     else:
         print("Evaluating the first two summaries for discrepancies...")
-        prompt = """<s>[INST] Evaluate two summaries for discrepancies. Return 'MISMATCH' and STOP if any discrepancies exist. Otherwise, consolidate into a final report.
+        prompt = f"""<s>[INST] Evaluate two summaries for discrepancies. Return 'MISMATCH' and STOP if any discrepancies exist. Otherwise, consolidate into a final report.
 First summary:
 {text1}
 
 Second summary:
-{text2}[/INST]</s>""".format(text1=text1, text2=text2)
+{text2}[/INST]</s>"""
 
-    # Assuming the `llm` function call structure, needs adjustment based on actual LLM API
     output = llm(prompt=prompt, max_tokens=4096, stop=["</s>"], echo=False)
     final_response = output['choices'][0]['text'].strip() if output.get('choices') else "No response generated."
 
     if "MISMATCH" in final_response and not summaries_exist:
-        # Modification to ensure a third summary is generated only when needed
         print("Discrepancy detected. Generating a third summary for further validation...")
-        # Fixed the recursive call to avoid potential infinite loops
         current_date = datetime.datetime.now()
+        # Assume `analyze_and_summarize` is correctly defined elsewhere in your script
         analyze_and_summarize(text1 + "\n" + text2, llm, "Validation Run", current_date, 'summary3.txt')
-        # Recursive call removed to prevent potential infinite loop
-        # Call `finalize_summary` again only if necessary after reviewing the new `summary3.txt`
+        # After generating the third summary, you should manually call `finalize_summary` again 
+        # to re-evaluate with the new summary3.txt included
     elif "MISMATCH" in final_response and summaries_exist:
-        print("Discrepancies detected even after three summaries. Attempting a final consolidation...")
-        # Logic for further action if needed, potentially manual review
+        print("Discrepancies detected even after three summaries. Manual review required.")
     else:
-        if summaries_exist or not summaries_exist and "MISMATCH" not in final_response:
+        if summaries_exist or ("MISMATCH" not in final_response):
             print("Final consolidation derived from the available summaries.")
             with open('final_summary.txt', 'w') as file:
                 file.write(final_response)
             print("Final summary has been organized and written to 'final_summary.txt'.")
+
 def main():
     """
     Main function to execute the script. It processes .ics calendar files,
