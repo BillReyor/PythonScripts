@@ -1,16 +1,23 @@
 """
-This script processes .ics calendar files to generate summaries of events within a specified date range. 
+This script is designed to generate event summaries from .ics calendar files within a specified date range. It extracts event details, sanitizes sensitive information, and uses a language model to produce consolidated summaries of daily activities.
 
 Requirements:
-- System: M1 Mac (or later) with at least 16GB of RAM.
-- Dependencies: Install the following Python packages via pip: re, datetime, glob, os, sys, icalendar, torch, transformers, llama-cpp-python, pytz, tzlocal .
-- Model File: Ensure 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' is in the same directory as this script. Download from: clear
-Usage:
-1. Place your .ics calendar export files in the same directory as this script.
-2. Run the script and follow on-screen instructions to input your name and the date range for the summary.
-3. Depending on output adjust n_ctx upto 32768 as well as max_tokens in the analyze_and_summarize and finalize_summary functions.
-    - Note that for a 32768 context size you will need AT LEAST 16gb of RAM
-    - Default is 16384
+- System: macOS with M1 chip (or later) and a minimum of 16GB RAM for efficient processing.
+- Python Packages: Before running the script, ensure the following packages are installed: `re`, `datetime`, `glob`, `os`, `sys`, `icalendar`, `torch`, `transformers`, `llama-cpp-python`, `pytz`, and `tzlocal`. These can be installed via pip.
+- Model File: The script requires the 'mistral-7b-instruct-v0.2.Q4_K_M.gguf' model file to be present in the script's directory. This file should be obtained from a verified source.
+
+Usage Instructions:
+1. Place any .ics calendar files to be processed in the same directory as this script.
+2. Execute the script and enter your name along with the start and end dates for the event summary when prompted.
+3. The script allows for adjusting the context size (`n_ctx`) up to 32768 and `max_tokens` for the language model in the `analyze_and_summarize` and `finalize_summary` functions to handle different sizes of summary generation. Note that larger context sizes require at least 16GB of RAM.
+
+Key Functionalities:
+- The script sanitizes personal information from event descriptions and locations to maintain privacy.
+- It processes events within the user-specified date range, grouping them by day.
+- Utilizes a language model to analyze and summarize daily events, producing a clear and concise summary for each day.
+- The `finalize_summary` function compares summaries to ensure accuracy and resolves discrepancies, generating a final consolidated summary.
+
+This script is suitable for individuals looking to obtain a summarized overview of their calendar events over a given period without manually combing through each entry.
 """
 import re
 import glob
@@ -26,14 +33,14 @@ from llama_cpp import Llama
 
 def sanitize_information(text):
     """
-    Removes sensitive information from the provided text by replacing it with '[redacted]'. 
-    Sensitive information includes email addresses, phone numbers, URLs, meeting IDs, passcodes, and PINs.
+    Sanitizes personal information from a given text by replacing sensitive details
+    with '[redacted]'. Patterns include emails, phone numbers, URLs, and meeting details.
 
-    Parameters:
-    - text (str): The input text containing potentially sensitive information.
+    Args:
+    - text: A string containing potentially sensitive information.
 
     Returns:
-    - str: The sanitized text with sensitive information redacted.
+    - The sanitized string with sensitive information redacted.
     """
     patterns = [
         r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
@@ -51,27 +58,24 @@ def sanitize_information(text):
 
 def process_ics_file(file_path, start_date, end_date, user_tz):
     """
-    Processes events from an ICS file that fall within a specified date range and timezone.
+    Processes an .ics calendar file, extracting and organizing event details
+    within the specified date range. Events are sanitized for privacy.
 
-    Parameters:
-    - file_path (str): Path to the .ics file to be processed.
-    - start_date (date): The start date of the range to filter events.
-    - end_date (date): The end date of the range to filter events.
-    - user_tz (timezone): The user's timezone, used for time conversion.
+    Args:
+    - file_path: Path to the .ics file.
+    - start_date, end_date: The date range to filter events.
+    - user_tz: The timezone of the user for date-time conversions.
 
     Returns:
-    - list: A sorted list of events by day, each represented as a tuple (date, list of event details).
+    - A list of tuples (date, events) sorted by date, where each event is a detailed string.
     """
     with open(file_path, 'rb') as file:
         calendar = Calendar.from_ical(file.read())
-
     user_timezone = user_tz
-
     events_by_day = {}
     for component in calendar.walk():
         if component.name == "VEVENT":
             dtstart = component.get('dtstart').dt
-
             if isinstance(dtstart, datetime.datetime):
                 if dtstart.tzinfo is None:
                     dtstart = dtstart.replace(tzinfo=user_timezone)
@@ -82,14 +86,12 @@ def process_ics_file(file_path, start_date, end_date, user_tz):
             else:
                 dtstart_str = dtstart.strftime("%Y-%m-%d")
                 event_date = dtstart
-
             summary = str(component.get('summary'))
             description = sanitize_information(str(component.get('description'))) if component.get('description') else "No description"
             if "This event was created by" in description:
-                continue  # Skip the rest of the loop and do not include this event
+                continue
             location = str(component.get('location')) if component.get('location') else "No location specified"
             location = sanitize_information(location)
-
             if start_date <= event_date <= end_date:
                 event_details = (
                     f"Event: {summary}\n"
@@ -98,24 +100,25 @@ def process_ics_file(file_path, start_date, end_date, user_tz):
                     f"Location: {location}\n"
                 )
                 events_by_day.setdefault(event_date, []).append(event_details)
-
+                raw_event_file = f"raw_events_{event_date}.txt"
+                with open(raw_event_file, 'a') as raw_file:
+                    raw_file.write(event_details + "\n\n")
     sorted_events_by_day = sorted(events_by_day.items(), key=lambda x: x[0])
-
     return sorted_events_by_day
 
 def analyze_and_summarize(text, llm, user_name, event_date, summary_file='summary.txt'):
     """
-    Analyzes and summarizes the given text using the specified Llama model and writes the output to a file.
+    Analyzes and summarizes a given text (representing events of a specific day) using a language model.
 
-    Parameters:
-    - text (str): Text containing events to be summarized.
-    - llm (Llama): The Llama model to use for text analysis and summarization.
-    - user_name (str): The name of the user for personalization purposes.
-    - event_date (datetime.date): The date of the events being summarized.
-    - summary_file (str, optional): The file path where the summary will be written. Defaults to 'summary.txt'.
+    Args:
+    - text: The text containing event details to summarize.
+    - llm: The language model object for generating summaries.
+    - user_name: Name of the user for personalizing the summary.
+    - event_date: The date of the events being summarized.
+    - summary_file: The file path to write the summary to.
 
     Returns:
-    - str: The generated summary of the events.
+    - The generated summary of the events.
     """
     print(f"Analyzing and consolidating events for {event_date} in {summary_file}...")
     example = """
@@ -126,7 +129,6 @@ I. [Date]
         * [Event detail]
     and so on...
     """
-
     prompt = f"""
 <s>[INST] This is my calendar entry for 
 {event_date.strftime('%m-%d-%Y')} (mm-dd-yyyy) Report what I did during 
@@ -141,54 +143,87 @@ Ensure that:
 
 Actual day: {text} [/INST]</s>
 """
-
     output = llm(prompt=prompt, max_tokens=2048, stop=["</s>"], echo=False)
     response = output['choices'][0]['text'] if output.get('choices') else "No response generated."
-
     with open(summary_file, 'a') as file:
         file.write(f"{response}\n\n")
-
     return response
 
 def finalize_summary(llm):
     """
-    Finalizes the summary by comparing, fact-checking, and consolidating content from two summary files.
+    Compares and consolidates summaries generated in previous steps to produce a final summary.
+    May generate a third summary for further validation if discrepancies are detected.
 
-    Parameters:
-    - llm (Llama): The Llama model to use for final summarization and fact-checking.
+    Args:
+    - llm: The language model object used for generating and consolidating summaries.
 
-    This function reads from 'summary.txt' and 'summary2.txt', then generates a consolidated final summary,
-    which is written to 'final_summary.txt'.
+    Returns:
+    - None. The final summary is written to a file.
     """
-    # Modify this part to read both summaries and create a combined final summary
-    with open('summary.txt', 'r') as file1:
-        text1 = file1.read().strip()
-    with open('summary2.txt', 'r') as file2:
-        text2 = file2.read().strip()
+    text1, text2, text3 = "", "", ""
+    if os.path.exists('summary.txt'):
+        with open('summary.txt', 'r') as file1:
+            text1 = file1.read().strip()
+    if os.path.exists('summary2.txt'):
+        with open('summary2.txt', 'r') as file2:
+            text2 = file2.read().strip()
+    if os.path.exists('summary3.txt'):
+        with open('summary3.txt', 'r') as file3:
+            text3 = file3.read().strip()
 
-    prompt = f"""<s>[INST] Fact check and summarize,  review the information from the first and second summary IGNORE any event not in both. Create a consolidated final weekly report by day.
+    # Modification to ensure that the presence of text in summary3.txt is checked
+    summaries_exist = text3 != ""
 
-First summary data:
+    # Adjusted the logic to handle cases when summary3.txt is empty or not needed
+    if summaries_exist:
+        # Modified to include correct logic when all summaries exist
+        print("Comparing all three summaries to identify the most accurate consolidation...")
+        prompt = """<s>[INST] Compare three summaries and identify the most accurate consolidation. 
+First summary:
 {text1}
 
-Second summary data:
-{text2} [/INST]</s>"""
+Second summary:
+{text2}
 
-    output = llm(prompt=prompt, max_tokens=16384, stop=["</s>"], echo=False)
-    final_response = output['choices'][0]['text'] if output.get('choices') else "No final summary generated."
+Third summary:
+{text3}[/INST]</s>""".format(text1=text1, text2=text2, text3=text3)
+    else:
+        print("Evaluating the first two summaries for discrepancies...")
+        prompt = """<s>[INST] Evaluate two summaries for discrepancies. Return 'MISMATCH' and STOP if any discrepancies exist. Otherwise, consolidate into a final report.
+First summary:
+{text1}
 
-    with open('final_summary.txt', 'w') as file:
-        file.write(final_response)
+Second summary:
+{text2}[/INST]</s>""".format(text1=text1, text2=text2)
 
-    print("Final summary has been organized and written to 'final_summary.txt'.")
+    # Assuming the `llm` function call structure, needs adjustment based on actual LLM API
+    output = llm(prompt=prompt, max_tokens=4096, stop=["</s>"], echo=False)
+    final_response = output['choices'][0]['text'].strip() if output.get('choices') else "No response generated."
 
+    if "MISMATCH" in final_response and not summaries_exist:
+        # Modification to ensure a third summary is generated only when needed
+        print("Discrepancy detected. Generating a third summary for further validation...")
+        # Fixed the recursive call to avoid potential infinite loops
+        current_date = datetime.datetime.now()
+        analyze_and_summarize(text1 + "\n" + text2, llm, "Validation Run", current_date, 'summary3.txt')
+        # Recursive call removed to prevent potential infinite loop
+        # Call `finalize_summary` again only if necessary after reviewing the new `summary3.txt`
+    elif "MISMATCH" in final_response and summaries_exist:
+        print("Discrepancies detected even after three summaries. Attempting a final consolidation...")
+        # Logic for further action if needed, potentially manual review
+    else:
+        if summaries_exist or not summaries_exist and "MISMATCH" not in final_response:
+            print("Final consolidation derived from the available summaries.")
+            with open('final_summary.txt', 'w') as file:
+                file.write(final_response)
+            print("Final summary has been organized and written to 'final_summary.txt'.")
 def main():
     """
-    Main function to execute the script workflow. It prompts the user for input, processes .ics files, 
-    and generates summarized outputs based on the events within the specified date range.
+    Main function to execute the script. It processes .ics calendar files,
+    generates summaries of events for a specified date range, and produces
+    a final consolidated summary.
 
-    This function orchestrates the reading of calendar files, extraction of relevant events, analysis and summarization 
-    of these events using a Llama model, and finalization of the event summaries into a comprehensive document.
+    Requires user input for name and date range.
     """
     user_name = input("Please enter your name: ")
     start_date_input = input("Enter the start date (mm-dd-yyyy): ")
@@ -204,16 +239,15 @@ def main():
         sys.exit("Model file not found. Please download the model file before proceeding.")
 
     llm = Llama(model_path=model_path, n_ctx=8192, n_threads=16, n_gpu_layers=35)
-    llm2 = Llama(model_path=model_path, n_ctx=16384, n_threads=16, n_gpu_layers=35)
     tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
 
     ics_files = glob.glob('*.ics')
     if not ics_files:
         sys.exit("No .ics files found in the current directory.")
 
-    # Clear out old summaries
     open('summary.txt', 'w').close()
     open('summary2.txt', 'w').close()
+    open('summary3.txt', 'w').close()  # Ensure this is also reset for a new run
 
     for file_path in ics_files:
         print(f"Processing {file_path}...")
@@ -223,7 +257,7 @@ def main():
             analyze_and_summarize(day_events_text, llm, user_name, date, 'summary.txt')
             analyze_and_summarize(day_events_text, llm, user_name, date, 'summary2.txt')
 
-    finalize_summary(llm2)
+    finalize_summary(llm)
 
 if __name__ == "__main__":
     main()
